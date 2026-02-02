@@ -26,7 +26,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password_bytes, hash_bytes)
 
 
-def create_token(app, payload: dict, expires_minutes: int = 60) -> str:
+def create_token(app, payload: dict, expires_minutes: int = 43200) -> str:
     secret = app.config.get('JWT_SECRET')
     exp = datetime.datetime.utcnow() + datetime.timedelta(minutes=expires_minutes)
     to_encode = {**payload, 'exp': exp}
