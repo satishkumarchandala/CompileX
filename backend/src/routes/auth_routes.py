@@ -36,7 +36,12 @@ def register():
     }
     db.users.insert_one(user)
 
-    token = create_token(current_app, {'uid': str(user['_id']), 'role': role})
+    token = create_token(current_app, {
+        'uid': str(user['_id']), 
+        'role': role,
+        'name': name,
+        'email': email
+    })
     return {'token': token, 'role': role}
 
 
@@ -53,5 +58,10 @@ def login():
     if not user or not verify_password(password, user['passwordHash']):
         return {'error': 'Invalid credentials'}, 401
 
-    token = create_token(current_app, {'uid': str(user['_id']), 'role': user['role']})
+    token = create_token(current_app, {
+        'uid': str(user['_id']), 
+        'role': user['role'],
+        'name': user['name'],
+        'email': user['email']
+    })
     return {'token': token, 'role': user['role']}
