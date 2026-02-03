@@ -67,27 +67,67 @@ def submit_contest(contest_id):
     db = get_db()
     data = request.get_json(force=True)
     student_id = data.get('studentId')
-    score = int(data.get('score', 0))
-    time_taken = int(data.get('timeTaken', 0))
-    negative = float(data.get('negativeMarking', 0))
-    total_questions = int(data.get('totalQuestions', 0))
+    answers = data.get('answers', [])  # List of {questionId, selectedOption}
+    
+    if not student_id:
+        return {'error': 'Missing studentId'}, 400
 
-    # Apply negative marking if provided
-    if negative and total_questions:
-        wrong = max(total_questions - score, 0)
-        score = max(int(score - wrong * negative), 0)
+    # verify contest exists
+    contest = db.contests.find_one({'_id': ObjectId(contest_id)})
+    if not contest:
+        return {'error': 'Contest not found'}, 404
 
+    # Calculate score
+    module_ids = contest.get('moduleIds', [])
+    # Get all questions
+    questions = list(db.questions.find({'moduleId': {'$in': module_ids}}))
+    question_map = {str(q['_id']): q for q in questions}
+
+    marks_per_question = contest.get('marksPerQuestion', 1)
+    negative_marking = contest.get('negativeMarking', 0)
+
+    score = 0
+    correct_count = 0
+    wrong_count = 0
+    
+    processed_answers = []
+
+    for ans in answers:
+        q_id = ans.get('questionId')
+        selected = int(ans.get('selectedOption', -1))
+        
+        q_obj = question_map.get(q_id)
+        if q_obj:
+            is_correct = (selected == q_obj.get('correctAnswer'))
+            if is_correct:
+                score += marks_per_question
+                correct_count += 1
+            elif selected != -1: # Answered but wrong
+                score -= negative_marking
+                wrong_count += 1
+            
+            processed_answers.append({
+                'questionId': q_id,
+                'selectedOption': selected,
+                'isCorrect': is_correct
+            })
+
+    score = max(score, 0) # Ensure no negative total score? Or allow negative? Usually 0 floor.
+    
+    # Update leaderboard
     db.leaderboard.update_one({
         'contestId': ObjectId(contest_id),
         'studentId': ObjectId(student_id)
     }, {'$set': {
         'score': score,
-        'timeTaken': time_taken
+        'answers': processed_answers,
+        'submittedAt': __import__('datetime').datetime.utcnow(),
+        'isSubmitted': True
     }}, upsert=True)
 
-    # Recompute ranks (score desc, time asc)
+    # Recompute ranks
     entries = list(db.leaderboard.find({'contestId': ObjectId(contest_id)}))
-    entries.sort(key=lambda e: (-int(e.get('score', 0)), int(e.get('timeTaken', 0))))
+    entries.sort(key=lambda e: (-int(e.get('score', 0))))
     for i, e in enumerate(entries, start=1):
         db.leaderboard.update_one({'_id': e['_id']}, {'$set': {'rank': i}})
 
@@ -96,7 +136,42 @@ def submit_contest(contest_id):
         top = entries[0]
         db.users.update_one({'_id': top['studentId']}, {'$addToSet': {'badges': BADGE_CONTEST_WINNER}})
 
-    return {'status': 'submitted'}
+    return {'status': 'submitted', 'score': score}
+
+
+@contest_bp.get('/contests/result/<contest_id>/<student_id>')
+def get_contest_result(contest_id, student_id):
+    from bson import ObjectId
+    db = get_db()
+    
+    entry = db.leaderboard.find_one({
+        'contestId': ObjectId(contest_id),
+        'studentId': ObjectId(student_id)
+    })
+    
+    if not entry:
+        return {'status': 'not_attempted'}
+    
+    result = {
+        'status': 'submitted' if entry.get('isSubmitted') else 'joined',
+        'score': entry.get('score', 0),
+        'rank': entry.get('rank'),
+        'answers': entry.get('answers', [])
+    }
+
+    # If submitted, enrich with correct answers for review
+    if entry.get('isSubmitted'):
+        review_answers = result['answers']
+        q_ids = [ObjectId(a['questionId']) for a in review_answers if 'questionId' in a]
+        if q_ids:
+            # Fetch correct answers
+            questions_data = list(db.questions.find({'_id': {'$in': q_ids}}, {'correctAnswer': 1}))
+            q_map = {str(q['_id']): q.get('correctAnswer') for q in questions_data}
+            
+            for ans in review_answers:
+                ans['correctOption'] = q_map.get(ans.get('questionId'))
+
+    return result
 
 
 @contest_bp.get('/contests/leaderboard/<contest_id>')
