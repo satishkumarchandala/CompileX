@@ -133,6 +133,62 @@ def create_question():
     return {'status': 'created'}
 
 
+@admin_bp.get('/module/<module_id>/questions')
+def get_module_questions(module_id):
+    from bson import ObjectId
+    db = get_db()
+    
+    questions = list(db.questions.find({'moduleId': ObjectId(module_id)}))
+    for q in questions:
+        q['_id'] = str(q['_id'])
+        q['moduleId'] = str(q['moduleId'])
+    
+    return {'questions': questions}
+
+
+@admin_bp.put('/question/update/<question_id>')
+def update_question(question_id):
+    from bson import ObjectId
+    db = get_db()
+    data = request.get_json(force=True)
+    
+    update_data = {}
+    if 'question' in data:
+        update_data['question'] = data['question']
+    if 'options' in data:
+        update_data['options'] = data['options']
+    if 'correctAnswer' in data:
+        update_data['correctAnswer'] = int(data['correctAnswer'])
+    if 'difficulty' in data:
+        update_data['difficulty'] = data['difficulty']
+    
+    if not update_data:
+        return {'error': 'No fields to update'}, 400
+    
+    result = db.questions.update_one(
+        {'_id': ObjectId(question_id)},
+        {'$set': update_data}
+    )
+    
+    if result.matched_count == 0:
+        return {'error': 'Question not found'}, 404
+    
+    return {'status': 'updated', 'modifiedCount': result.modified_count}
+
+
+@admin_bp.delete('/question/delete/<question_id>')
+def delete_question(question_id):
+    from bson import ObjectId
+    db = get_db()
+    
+    result = db.questions.delete_one({'_id': ObjectId(question_id)})
+    
+    if result.deleted_count == 0:
+        return {'error': 'Question not found'}, 404
+    
+    return {'status': 'deleted', 'deletedCount': result.deleted_count}
+
+
 @admin_bp.post('/pdf/upload')
 def upload_pdf():
     # Expect multipart/form-data with file
@@ -243,8 +299,24 @@ def create_contest():
         'negativeMarking': negative,
         'tieBreak': tie_breaker
     }
-    db.contests.insert_one(contest)
-    return {'status': 'created'}
+    result = db.contests.insert_one(contest)
+    contest_id = result.inserted_id
+
+    # Handle custom questions
+    custom_questions = data.get('customQuestions', [])
+    if custom_questions:
+        for q_data in custom_questions:
+            question = {
+                'contestId': contest_id,
+                'question': q_data['question'],
+                'options': q_data['options'],
+                'correctAnswer': int(q_data['correctAnswer']),
+                'difficulty': 'medium', # Default
+                'source': 'custom_contest'
+            }
+            db.questions.insert_one(question)
+
+    return {'status': 'created', 'contestId': str(contest_id)}
 
 
 @admin_bp.put('/contest/update/<contest_id>')

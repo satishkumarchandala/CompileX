@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const API = axios.create({
-  baseURL: 'https://compilex-1-u5bd.onrender.com/api',
+  baseURL: 'http://localhost:5000/api',
   headers: { 'Content-Type': 'application/json' }
 })
 
@@ -35,5 +35,8 @@ export const generateModuleFromPDF = (formData) => API.post('/admin/pdf/generate
 export const createContest = (data) => API.post('/admin/contest/create', data)
 export const updateContest = (contestId, data) => API.put(`/admin/contest/update/${contestId}`, data)
 export const deleteContest = (contestId) => API.delete(`/admin/contest/delete/${contestId}`)
+export const getAdminModuleQuestions = (moduleId) => API.get(`/admin/module/${moduleId}/questions`)
+export const updateQuestion = (questionId, data) => API.put(`/admin/question/update/${questionId}`, data)
+export const deleteQuestion = (questionId) => API.delete(`/admin/question/delete/${questionId}`)
 
 export default API

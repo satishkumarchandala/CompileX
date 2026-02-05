@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { 
+import {
   Container, Grid, Card, CardContent, CardActionArea, Typography, Box, Paper,
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField,
   Select, MenuItem, FormControl, InputLabel, Alert, Snackbar, IconButton,
   List, ListItem, ListItemText, ListItemSecondaryAction, Chip, Divider
 } from '@mui/material'
-import { 
-  Dashboard as DashboardIcon, LibraryBooks, Quiz, EmojiEvents, CloudUpload, 
-  People, Close, Edit, Delete, Visibility, School, QuestionAnswer, 
+import {
+  Dashboard as DashboardIcon, LibraryBooks, Quiz, EmojiEvents, CloudUpload,
+  People, Close, Edit, Delete, Visibility, School, QuestionAnswer,
   EmojiPeople, TrendingUp, Assessment, Speed
 } from '@mui/icons-material'
-import { getAdminStats, createModule, updateModule, deleteModule, createQuestion, uploadPDF, generateModuleFromPDF, createContest, updateContest, deleteContest, getCourses, getAllModules } from '../api'
+import { getAdminStats, createModule, updateModule, deleteModule, createQuestion, updateQuestion, deleteQuestion, getAdminModuleQuestions, uploadPDF, generateModuleFromPDF, createContest, updateContest, deleteContest, getCourses, getAllModules } from '../api'
 
 export default function AdminDashboard() {
   const [openDialog, setOpenDialog] = useState('')
@@ -21,7 +21,23 @@ export default function AdminDashboard() {
   const [editingContest, setEditingContest] = useState(null)
   const [stats, setStats] = useState(null)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
-  
+
+  // Question Management State
+  const [questionsList, setQuestionsList] = useState([])
+  const [currentModuleId, setCurrentModuleId] = useState(null)
+  const [editingQuestion, setEditingQuestion] = useState(null)
+
+  // Custom Contest Questions State
+  const [customContestQuestions, setCustomContestQuestions] = useState([])
+  const [newCustomQuestion, setNewCustomQuestion] = useState({
+    question: '',
+    option1: '',
+    option2: '',
+    option3: '',
+    option4: '',
+    correctAnswer: 0
+  })
+
   // Module form state
   const [moduleForm, setModuleForm] = useState({
     courseId: '',
@@ -72,16 +88,16 @@ export default function AdminDashboard() {
     try {
       const coursesRes = await getCourses()
       setCourses(coursesRes.data.courses)
-      
+
       // Load all modules directly
       const modulesRes = await getAllModules()
       setAllModules(modulesRes.data.modules)
-      
+
       // Load all contests
       const { getContests } = await import('../api')
       const contestsRes = await getContests()
       setAllContests(contestsRes.data.contests)
-      
+
       // Load admin stats
       const statsRes = await getAdminStats()
       setStats(statsRes.data)
@@ -102,6 +118,11 @@ export default function AdminDashboard() {
     setPdfResult(null)
     setPdfModuleForm({ courseId: '', moduleTitle: '', numQuestions: 10 })
     setGeneratingModule(false)
+    setQuestionsList([])
+    setCurrentModuleId(null)
+    setEditingQuestion(null)
+    setCustomContestQuestions([])
+    setNewCustomQuestion({ question: '', option1: '', option2: '', option3: '', option4: '', correctAnswer: 0 })
   }
 
   const showSnackbar = (message, severity = 'success') => {
@@ -167,20 +188,76 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleCreateQuestion = async () => {
+  const handleViewModuleQuestions = async (moduleId) => {
     try {
-      await createQuestion({
-        moduleId: questionForm.moduleId,
+      const res = await getAdminModuleQuestions(moduleId)
+      setQuestionsList(res.data.questions)
+      setCurrentModuleId(moduleId)
+      setOpenDialog('manageQuestions')
+    } catch (err) {
+      showSnackbar('Failed to load questions', 'error')
+    }
+  }
+
+  const handleEditQuestion = (question) => {
+    setEditingQuestion(question)
+    setQuestionForm({
+      moduleId: question.moduleId,
+      question: question.question,
+      option1: question.options[0],
+      option2: question.options[1],
+      option3: question.options[2],
+      option4: question.options[3],
+      correctAnswer: question.correctAnswer,
+      difficulty: question.difficulty
+    })
+    setOpenDialog('question')
+  }
+
+  const handleDeleteQuestion = async (questionId) => {
+    if (!window.confirm('Are you sure you want to delete this question?')) return
+    try {
+      await deleteQuestion(questionId)
+      showSnackbar('Question deleted successfully!')
+      // Refresh list
+      if (currentModuleId) {
+        handleViewModuleQuestions(currentModuleId)
+      }
+    } catch (err) {
+      showSnackbar('Failed to delete question', 'error')
+    }
+  }
+
+  const handleSaveQuestion = async () => {
+    try {
+      const questionData = {
         question: questionForm.question,
         options: [questionForm.option1, questionForm.option2, questionForm.option3, questionForm.option4],
         correctAnswer: parseInt(questionForm.correctAnswer),
         difficulty: questionForm.difficulty
-      })
-      showSnackbar('Question created successfully!')
+      }
+
+      if (editingQuestion) {
+        await updateQuestion(editingQuestion._id, questionData)
+        showSnackbar('Question updated successfully!')
+        if (currentModuleId) handleViewModuleQuestions(currentModuleId)
+      } else {
+        await createQuestion({
+          moduleId: questionForm.moduleId,
+          ...questionData
+        })
+        showSnackbar('Question created successfully!')
+      }
+
       handleCloseDialog()
       await loadCourses() // Reload to update stats
+
+      // If we were managing questions, reopen that dialog
+      if (currentModuleId) {
+        handleViewModuleQuestions(currentModuleId)
+      }
     } catch (err) {
-      showSnackbar(err.response?.data?.error || 'Failed to create question', 'error')
+      showSnackbar(err.response?.data?.error || 'Failed to save question', 'error')
     }
   }
 
@@ -202,7 +279,7 @@ export default function AdminDashboard() {
       showSnackbar('Please select PDF, course, and provide module title', 'error')
       return
     }
-    
+
     setGeneratingModule(true)
     try {
       const formData = new FormData()
@@ -210,7 +287,7 @@ export default function AdminDashboard() {
       formData.append('courseId', pdfModuleForm.courseId)
       formData.append('moduleTitle', pdfModuleForm.moduleTitle)
       formData.append('numQuestions', pdfModuleForm.numQuestions)
-      
+
       const res = await generateModuleFromPDF(formData)
       showSnackbar(res.data.message || 'Module and questions generated successfully!', 'success')
       handleCloseDialog()
@@ -222,9 +299,30 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleAddCustomQuestion = () => {
+    if (!newCustomQuestion.question || !newCustomQuestion.option1 || !newCustomQuestion.option2) {
+      showSnackbar('Please fill at least the question and two options', 'error')
+      return
+    }
+    setCustomContestQuestions([...customContestQuestions, {
+      ...newCustomQuestion,
+      options: [newCustomQuestion.option1, newCustomQuestion.option2, newCustomQuestion.option3, newCustomQuestion.option4].filter(o => o)
+    }])
+    setNewCustomQuestion({ question: '', option1: '', option2: '', option3: '', option4: '', correctAnswer: 0 })
+  }
+
+  const handleRemoveCustomQuestion = (index) => {
+    const updated = [...customContestQuestions]
+    updated.splice(index, 1)
+    setCustomContestQuestions(updated)
+  }
+
   const handleCreateContest = async () => {
     try {
-      await createContest(contestForm)
+      await createContest({
+        ...contestForm,
+        customQuestions: customContestQuestions
+      })
       showSnackbar('Contest created successfully!')
       handleCloseDialog()
       await loadCourses() // Reload to update stats
@@ -500,16 +598,16 @@ export default function AdminDashboard() {
       <Grid container spacing={3}>
         {actions.map((action, idx) => (
           <Grid item xs={12} sm={6} md={4} key={idx}>
-            <Card 
+            <Card
               elevation={0}
-              sx={{ 
+              sx={{
                 height: '100%',
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 2,
                 transition: 'all 0.3s',
                 cursor: 'pointer',
-                '&:hover': { 
+                '&:hover': {
                   transform: 'translateY(-4px)',
                   boxShadow: 4,
                   borderColor: action.color,
@@ -565,7 +663,7 @@ export default function AdminDashboard() {
         <DialogContent>
           <FormControl fullWidth margin="normal">
             <InputLabel>Course</InputLabel>
-            <Select value={moduleForm.courseId} onChange={e => setModuleForm({...moduleForm, courseId: e.target.value})} label="Course">
+            <Select value={moduleForm.courseId} onChange={e => setModuleForm({ ...moduleForm, courseId: e.target.value })} label="Course">
               {courses.map(c => <MenuItem key={c._id} value={c._id}>{c.title}</MenuItem>)}
             </Select>
           </FormControl>
@@ -574,14 +672,14 @@ export default function AdminDashboard() {
             label="Module Number"
             type="number"
             value={moduleForm.moduleNo}
-            onChange={e => setModuleForm({...moduleForm, moduleNo: e.target.value})}
+            onChange={e => setModuleForm({ ...moduleForm, moduleNo: e.target.value })}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Module Title"
             value={moduleForm.title}
-            onChange={e => setModuleForm({...moduleForm, title: e.target.value})}
+            onChange={e => setModuleForm({ ...moduleForm, title: e.target.value })}
             margin="normal"
           />
           <TextField
@@ -590,7 +688,7 @@ export default function AdminDashboard() {
             multiline
             rows={4}
             value={moduleForm.context}
-            onChange={e => setModuleForm({...moduleForm, context: e.target.value})}
+            onChange={e => setModuleForm({ ...moduleForm, context: e.target.value })}
             margin="normal"
           />
           <TextField
@@ -599,7 +697,7 @@ export default function AdminDashboard() {
             multiline
             rows={3}
             value={moduleForm.videoLinks}
-            onChange={e => setModuleForm({...moduleForm, videoLinks: e.target.value})}
+            onChange={e => setModuleForm({ ...moduleForm, videoLinks: e.target.value })}
             margin="normal"
             placeholder="https://www.youtube.com/watch?v=VIDEO_ID&#10;https://youtu.be/VIDEO_ID"
             helperText="Add YouTube URLs - students will see embedded videos in the module"
@@ -659,16 +757,25 @@ export default function AdminDashboard() {
                       }
                     />
                     <ListItemSecondaryAction>
-                      <IconButton 
-                        edge="end" 
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleViewModuleQuestions(module._id)}
+                        sx={{ mr: 1 }}
+                        color="secondary"
+                        title="Manage Questions"
+                      >
+                        <QuestionAnswer />
+                      </IconButton>
+                      <IconButton
+                        edge="end"
                         onClick={() => handleEditModule(module)}
                         sx={{ mr: 1 }}
                         color="primary"
                       >
                         <Edit />
                       </IconButton>
-                      <IconButton 
-                        edge="end" 
+                      <IconButton
+                        edge="end"
                         onClick={() => handleDeleteModule(module._id)}
                         color="error"
                       >
@@ -687,10 +794,83 @@ export default function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
-      {/* Create Question Dialog */}
+      {/* Manage Questions Dialog */}
+      <Dialog open={openDialog === 'manageQuestions'} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Manage Questions
+          <IconButton onClick={handleCloseDialog} sx={{ position: 'absolute', right: 8, top: 8 }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {questionsList.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
+              No questions found in this module.
+            </Typography>
+          ) : (
+            <List>
+              {questionsList.map((q, idx) => (
+                <Box key={q._id}>
+                  <ListItem
+                    sx={{
+                      bgcolor: 'action.hover',
+                      borderRadius: 1,
+                      mb: 1
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Chip label={q.difficulty} size="small" color={q.difficulty === 'hard' ? 'error' : q.difficulty === 'medium' ? 'warning' : 'success'} />
+                          <Typography variant="body1" fontWeight={500}>
+                            {q.question}
+                          </Typography>
+                        </Box>
+                      }
+                      secondary={
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Correct Answer: {q.options[q.correctAnswer]}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleEditQuestion(q)}
+                        sx={{ mr: 1 }}
+                        color="primary"
+                      >
+                        <Edit />
+                      </IconButton>
+                      <IconButton
+                        edge="end"
+                        onClick={() => handleDeleteQuestion(q._id)}
+                        color="error"
+                      >
+                        <Delete />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {idx < questionsList.length - 1 && <Divider sx={{ my: 1 }} />}
+                </Box>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Close</Button>
+          <Button onClick={() => { setQuestionForm({ ...questionForm, moduleId: currentModuleId }); setOpenDialog('question'); }} variant="contained" startIcon={<QuestionAnswer />}>
+            Add Question
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create/Edit Question Dialog */}
       <Dialog open={openDialog === 'question'} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Create New Question
+          {editingQuestion ? 'Edit Question' : 'Create New Question'}
           <IconButton onClick={handleCloseDialog} sx={{ position: 'absolute', right: 8, top: 8 }}>
             <Close />
           </IconButton>
@@ -698,9 +878,9 @@ export default function AdminDashboard() {
         <DialogContent>
           <FormControl fullWidth margin="normal">
             <InputLabel>Module</InputLabel>
-            <Select 
-              value={questionForm.moduleId} 
-              onChange={e => setQuestionForm({...questionForm, moduleId: e.target.value})} 
+            <Select
+              value={questionForm.moduleId}
+              onChange={e => setQuestionForm({ ...questionForm, moduleId: e.target.value })}
               label="Module"
             >
               {allModules.map(m => (
@@ -716,40 +896,40 @@ export default function AdminDashboard() {
             multiline
             rows={2}
             value={questionForm.question}
-            onChange={e => setQuestionForm({...questionForm, question: e.target.value})}
+            onChange={e => setQuestionForm({ ...questionForm, question: e.target.value })}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Option 1"
             value={questionForm.option1}
-            onChange={e => setQuestionForm({...questionForm, option1: e.target.value})}
+            onChange={e => setQuestionForm({ ...questionForm, option1: e.target.value })}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Option 2"
             value={questionForm.option2}
-            onChange={e => setQuestionForm({...questionForm, option2: e.target.value})}
+            onChange={e => setQuestionForm({ ...questionForm, option2: e.target.value })}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Option 3"
             value={questionForm.option3}
-            onChange={e => setQuestionForm({...questionForm, option3: e.target.value})}
+            onChange={e => setQuestionForm({ ...questionForm, option3: e.target.value })}
             margin="normal"
           />
           <TextField
             fullWidth
             label="Option 4"
             value={questionForm.option4}
-            onChange={e => setQuestionForm({...questionForm, option4: e.target.value})}
+            onChange={e => setQuestionForm({ ...questionForm, option4: e.target.value })}
             margin="normal"
           />
           <FormControl fullWidth margin="normal">
             <InputLabel>Correct Answer</InputLabel>
-            <Select value={questionForm.correctAnswer} onChange={e => setQuestionForm({...questionForm, correctAnswer: e.target.value})} label="Correct Answer">
+            <Select value={questionForm.correctAnswer} onChange={e => setQuestionForm({ ...questionForm, correctAnswer: e.target.value })} label="Correct Answer">
               <MenuItem value={0}>Option 1</MenuItem>
               <MenuItem value={1}>Option 2</MenuItem>
               <MenuItem value={2}>Option 3</MenuItem>
@@ -758,7 +938,7 @@ export default function AdminDashboard() {
           </FormControl>
           <FormControl fullWidth margin="normal">
             <InputLabel>Difficulty</InputLabel>
-            <Select value={questionForm.difficulty} onChange={e => setQuestionForm({...questionForm, difficulty: e.target.value})} label="Difficulty">
+            <Select value={questionForm.difficulty} onChange={e => setQuestionForm({ ...questionForm, difficulty: e.target.value })} label="Difficulty">
               <MenuItem value="easy">Easy</MenuItem>
               <MenuItem value="medium">Medium</MenuItem>
               <MenuItem value="hard">Hard</MenuItem>
@@ -767,7 +947,9 @@ export default function AdminDashboard() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleCreateQuestion} variant="contained">Create</Button>
+          <Button onClick={handleSaveQuestion} variant="contained">
+            {editingQuestion ? 'Update' : 'Create'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -835,7 +1017,7 @@ export default function AdminDashboard() {
             <InputLabel>Select Course</InputLabel>
             <Select
               value={pdfModuleForm.courseId}
-              onChange={e => setPdfModuleForm({...pdfModuleForm, courseId: e.target.value})}
+              onChange={e => setPdfModuleForm({ ...pdfModuleForm, courseId: e.target.value })}
               label="Select Course"
             >
               {courses.map(c => (
@@ -847,7 +1029,7 @@ export default function AdminDashboard() {
             fullWidth
             label="Module Title"
             value={pdfModuleForm.moduleTitle}
-            onChange={e => setPdfModuleForm({...pdfModuleForm, moduleTitle: e.target.value})}
+            onChange={e => setPdfModuleForm({ ...pdfModuleForm, moduleTitle: e.target.value })}
             margin="normal"
             placeholder="e.g., Introduction to Data Structures"
           />
@@ -856,7 +1038,7 @@ export default function AdminDashboard() {
             label="Number of Questions"
             type="number"
             value={pdfModuleForm.numQuestions}
-            onChange={e => setPdfModuleForm({...pdfModuleForm, numQuestions: parseInt(e.target.value) || 10})}
+            onChange={e => setPdfModuleForm({ ...pdfModuleForm, numQuestions: parseInt(e.target.value) || 10 })}
             margin="normal"
             inputProps={{ min: 5, max: 50 }}
           />
@@ -874,9 +1056,9 @@ export default function AdminDashboard() {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog} disabled={generatingModule}>Cancel</Button>
-          <Button 
-            onClick={handleGenerateModuleFromPDF} 
-            variant="contained" 
+          <Button
+            onClick={handleGenerateModuleFromPDF}
+            variant="contained"
             disabled={!pdfFile || !pdfModuleForm.courseId || !pdfModuleForm.moduleTitle || generatingModule}
           >
             {generatingModule ? 'Generating...' : 'Generate Module'}
@@ -897,7 +1079,7 @@ export default function AdminDashboard() {
             fullWidth
             label="Contest Title"
             value={contestForm.title}
-            onChange={e => setContestForm({...contestForm, title: e.target.value})}
+            onChange={e => setContestForm({ ...contestForm, title: e.target.value })}
             margin="normal"
           />
           <FormControl fullWidth margin="normal">
@@ -905,7 +1087,7 @@ export default function AdminDashboard() {
             <Select
               multiple
               value={contestForm.moduleIds}
-              onChange={e => setContestForm({...contestForm, moduleIds: e.target.value})}
+              onChange={e => setContestForm({ ...contestForm, moduleIds: e.target.value })}
               label="Select Modules"
               renderValue={(selected) => (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -928,7 +1110,7 @@ export default function AdminDashboard() {
             label="Start Time"
             type="datetime-local"
             value={contestForm.startTime}
-            onChange={e => setContestForm({...contestForm, startTime: e.target.value})}
+            onChange={e => setContestForm({ ...contestForm, startTime: e.target.value })}
             margin="normal"
             InputLabelProps={{ shrink: true }}
           />
@@ -937,7 +1119,7 @@ export default function AdminDashboard() {
             label="End Time"
             type="datetime-local"
             value={contestForm.endTime}
-            onChange={e => setContestForm({...contestForm, endTime: e.target.value})}
+            onChange={e => setContestForm({ ...contestForm, endTime: e.target.value })}
             margin="normal"
             InputLabelProps={{ shrink: true }}
           />
@@ -946,7 +1128,7 @@ export default function AdminDashboard() {
             label="Duration (minutes)"
             type="number"
             value={contestForm.durationMinutes}
-            onChange={e => setContestForm({...contestForm, durationMinutes: parseInt(e.target.value)})}
+            onChange={e => setContestForm({ ...contestForm, durationMinutes: parseInt(e.target.value) })}
             margin="normal"
           />
           <TextField
@@ -954,7 +1136,7 @@ export default function AdminDashboard() {
             label="Marks per Question"
             type="number"
             value={contestForm.marksPerQuestion}
-            onChange={e => setContestForm({...contestForm, marksPerQuestion: parseInt(e.target.value)})}
+            onChange={e => setContestForm({ ...contestForm, marksPerQuestion: parseInt(e.target.value) })}
             margin="normal"
           />
           <TextField
@@ -962,10 +1144,64 @@ export default function AdminDashboard() {
             label="Negative Marking"
             type="number"
             value={contestForm.negativeMarking}
-            onChange={e => setContestForm({...contestForm, negativeMarking: parseFloat(e.target.value)})}
+            onChange={e => setContestForm({ ...contestForm, negativeMarking: parseFloat(e.target.value) })}
             margin="normal"
             inputProps={{ step: 0.25 }}
           />
+
+          {/* Custom Questions Section - Only for new contests */}
+          {!editingContest && (
+            <Box sx={{ mt: 3, mb: 1, borderTop: 1, borderColor: 'divider', pt: 2 }}>
+              <Typography variant="subtitle1" gutterBottom fontWeight={600}>
+                Custom Questions (Optional)
+              </Typography>
+
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                <TextField
+                  fullWidth
+                  label="Question Text"
+                  value={newCustomQuestion.question}
+                  onChange={e => setNewCustomQuestion({ ...newCustomQuestion, question: e.target.value })}
+                  margin="dense"
+                  size="small"
+                />
+                <Grid container spacing={1}>
+                  <Grid item xs={6}><TextField fullWidth label="Option 1" value={newCustomQuestion.option1} onChange={e => setNewCustomQuestion({ ...newCustomQuestion, option1: e.target.value })} margin="dense" size="small" /></Grid>
+                  <Grid item xs={6}><TextField fullWidth label="Option 2" value={newCustomQuestion.option2} onChange={e => setNewCustomQuestion({ ...newCustomQuestion, option2: e.target.value })} margin="dense" size="small" /></Grid>
+                  <Grid item xs={6}><TextField fullWidth label="Option 3" value={newCustomQuestion.option3} onChange={e => setNewCustomQuestion({ ...newCustomQuestion, option3: e.target.value })} margin="dense" size="small" /></Grid>
+                  <Grid item xs={6}><TextField fullWidth label="Option 4" value={newCustomQuestion.option4} onChange={e => setNewCustomQuestion({ ...newCustomQuestion, option4: e.target.value })} margin="dense" size="small" /></Grid>
+                </Grid>
+                <FormControl fullWidth margin="dense" size="small">
+                  <InputLabel>Correct Answer</InputLabel>
+                  <Select
+                    value={newCustomQuestion.correctAnswer}
+                    onChange={e => setNewCustomQuestion({ ...newCustomQuestion, correctAnswer: e.target.value })}
+                    label="Correct Answer"
+                  >
+                    <MenuItem value={0}>Option 1</MenuItem>
+                    <MenuItem value={1}>Option 2</MenuItem>
+                    <MenuItem value={2}>Option 3</MenuItem>
+                    <MenuItem value={3}>Option 4</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button variant="outlined" size="small" onClick={handleAddCustomQuestion} sx={{ mt: 1 }}>Add Custom Question</Button>
+              </Box>
+
+              {customContestQuestions.length > 0 && (
+                <List dense sx={{ maxHeight: 150, overflow: 'auto' }}>
+                  {customContestQuestions.map((q, i) => (
+                    <ListItem key={i} secondaryAction={
+                      <IconButton edge="end" size="small" onClick={() => handleRemoveCustomQuestion(i)}>
+                        <Close fontSize="small" />
+                      </IconButton>
+                    }>
+                      <ListItemText primary={q.question} secondary={`Ans: Option ${q.correctAnswer + 1}`} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
@@ -1016,12 +1252,12 @@ export default function AdminDashboard() {
                       secondary={
                         <Box sx={{ mt: 1 }}>
                           <Typography variant="body2" color="text.secondary">
-                            Modules: {contest.moduleIds?.length || 0} • 
+                            Modules: {contest.moduleIds?.length || 0} •
                             Marks per Q: {contest.marksPerQuestion || 1}
                           </Typography>
                           {contest.startTime && (
                             <Typography variant="caption" color="text.secondary">
-                              Start: {new Date(contest.startTime).toLocaleString()} • 
+                              Start: {new Date(contest.startTime).toLocaleString()} •
                               End: {new Date(contest.endTime).toLocaleString()}
                             </Typography>
                           )}
@@ -1048,13 +1284,13 @@ export default function AdminDashboard() {
         </DialogActions>
       </Dialog>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
-        onClose={() => setSnackbar({...snackbar, open: false})}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity={snackbar.severity} onClose={() => setSnackbar({...snackbar, open: false})}>
+        <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
           {snackbar.message}
         </Alert>
       </Snackbar>

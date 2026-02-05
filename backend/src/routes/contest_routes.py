@@ -15,9 +15,16 @@ def get_contest_questions(contest_id):
     if not contest:
         return {'error': 'Contest not found'}, 404
     
-    # Get all questions from the contest's modules
+    # Get all questions from the contest's modules AND custom questions linked to contest
     module_ids = contest.get('moduleIds', [])
-    questions = list(db.questions.find({'moduleId': {'$in': module_ids}}))
+    
+    query = {
+        '$or': [
+            {'moduleId': {'$in': module_ids}},
+            {'contestId': ObjectId(contest_id)}
+        ]
+    }
+    questions = list(db.questions.find(query))
     
     for q in questions:
         q['_id'] = str(q['_id'])
@@ -80,7 +87,13 @@ def submit_contest(contest_id):
     # Calculate score
     module_ids = contest.get('moduleIds', [])
     # Get all questions
-    questions = list(db.questions.find({'moduleId': {'$in': module_ids}}))
+    query = {
+        '$or': [
+            {'moduleId': {'$in': module_ids}},
+            {'contestId': ObjectId(contest_id)}
+        ]
+    }
+    questions = list(db.questions.find(query))
     question_map = {str(q['_id']): q for q in questions}
 
     marks_per_question = contest.get('marksPerQuestion', 1)
