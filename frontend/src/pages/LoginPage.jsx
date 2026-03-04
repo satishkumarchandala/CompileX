@@ -1,7 +1,7 @@
 import React, { useState, useContext } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { 
-  Container, Paper, TextField, Button, Typography, Box, Alert, Link 
+import {
+  Container, Paper, TextField, Button, Typography, Box, Alert, Link
 } from '@mui/material'
 import { Login as LoginIcon } from '@mui/icons-material'
 import { login as apiLogin } from '../api'
@@ -20,7 +20,8 @@ export default function LoginPage() {
     try {
       const res = await apiLogin({ email, password })
       loginUser(res.data.token, res.data.role)
-      if (res.data.role === 'admin') navigate('/admin')
+      if (res.data.role === 'super_admin') navigate('/superadmin')
+      else if (res.data.role === 'admin') navigate('/admin')
       else navigate('/')
     } catch {
       setError('Invalid email or password')

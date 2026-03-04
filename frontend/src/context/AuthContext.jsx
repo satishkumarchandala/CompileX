@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react'
-import {jwtDecode} from 'jwt-decode'
+import { jwtDecode } from 'jwt-decode'
 
 export const AuthContext = createContext()
 
@@ -17,7 +17,7 @@ export function AuthProvider({ children }) {
         const decoded = jwtDecode(token)
         setUserId(decoded.uid)
         setRole(decoded.role)
-        setUser({ name: decoded.name, email: decoded.email, role: decoded.role })
+        setUser({ name: decoded.name, email: decoded.email, role: decoded.role, uid: decoded.uid })
         setIsAuthenticated(true)
       } catch {
         localStorage.removeItem('token')
@@ -31,7 +31,7 @@ export function AuthProvider({ children }) {
     const decoded = jwtDecode(token)
     setUserId(decoded.uid)
     setRole(roleValue)
-    setUser({ name: decoded.name, email: decoded.email, role: roleValue })
+    setUser({ name: decoded.name, email: decoded.email, role: roleValue, uid: decoded.uid })
     setIsAuthenticated(true)
   }
 

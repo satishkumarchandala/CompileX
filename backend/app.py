@@ -3,7 +3,6 @@ from flask import Flask
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 from src.db import init_db
@@ -13,6 +12,7 @@ from src.routes.quiz_routes import quiz_bp
 from src.routes.gamification_routes import gamification_bp
 from src.routes.contest_routes import contest_bp
 from src.routes.admin_routes import admin_bp
+from src.routes.superadmin_routes import superadmin_bp
 from src.services.seed import seed_initial_data
 
 
@@ -20,26 +20,30 @@ def create_app():
     app = Flask(__name__)
     CORS(app)
 
-    app.config['JWT_SECRET'] = os.getenv('JWT_SECRET', 'devsecret')
-    app.config['ALLOW_ADMIN_REG'] = os.getenv('ALLOW_ADMIN_REG', 'true').lower() == 'true'
+    app.config['JWT_SECRET']           = os.getenv('JWT_SECRET', 'devsecret')
+    # Allow student self-registration (always True for public sign-up)
+    app.config['ALLOW_STUDENT_REG']    = True
+    # Set ALLOW_SUPER_ADMIN_REG=true in .env ONLY for the very first bootstrap
+    app.config['ALLOW_SUPER_ADMIN_REG'] = os.getenv('ALLOW_SUPER_ADMIN_REG', 'false').lower() == 'true'
 
-    # Initialize DB
+    # Initialize DB (also creates indexes)
     init_db()
 
     # Seed initial course/modules (idempotent)
     seed_initial_data()
 
-    # Register blueprints
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(course_bp, url_prefix='/api')
-    app.register_blueprint(quiz_bp, url_prefix='/api')
+    # ── Register Blueprints ───────────────────────────────────────────────────
+    app.register_blueprint(auth_bp,        url_prefix='/api/auth')
+    app.register_blueprint(course_bp,      url_prefix='/api')
+    app.register_blueprint(quiz_bp,        url_prefix='/api')
     app.register_blueprint(gamification_bp, url_prefix='/api')
-    app.register_blueprint(contest_bp, url_prefix='/api')
-    app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(contest_bp,     url_prefix='/api')
+    app.register_blueprint(admin_bp,       url_prefix='/api/admin')
+    app.register_blueprint(superadmin_bp,  url_prefix='/api/superadmin')
 
     @app.route('/api/health')
     def health():
-        return {'status': 'ok'}
+        return {'status': 'ok', 'version': '2.0'}
 
     return app
 

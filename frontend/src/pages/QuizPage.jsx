@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { 
+import {
   Container, Paper, Typography, Box, Button, RadioGroup, FormControlLabel,
   Radio, Card, CardContent, Divider, LinearProgress, Dialog, DialogTitle,
   DialogContent, DialogActions, Chip
@@ -68,7 +68,7 @@ export default function QuizPage() {
                       value={idx}
                       control={<Radio />}
                       label={opt}
-                      sx={{ 
+                      sx={{
                         bgcolor: 'background.paper',
                         m: 0.5,
                         px: 2,
@@ -116,8 +116,19 @@ export default function QuizPage() {
             <Typography variant="body1" color="text.secondary" mb={2}>
               Score: {result && Math.round(result.score / result.total * 100)}%
             </Typography>
-            <Chip label={`+${result?.xpEarned} XP`} color="secondary" size="large" />
-            {result?.newLevel && (
+            {result?.isFirstCompletion ? (
+              <>
+                <Chip label={`+${result?.xpEarned} XP Earned! 🎉`} color="secondary" size="large" />
+                <Typography variant="body2" color="success.main" fontWeight={600} mt={1}>
+                  ✅ Module Completed for the first time!
+                </Typography>
+              </>
+            ) : result?.moduleCompleted ? (
+              <Chip label="Module already completed – no XP awarded" color="default" size="medium" variant="outlined" />
+            ) : (
+              <Chip label="Score ≥ 70% to complete this module and earn XP" color="warning" size="medium" variant="outlined" />
+            )}
+            {result?.newLevel > result?.previousLevel && (
               <Typography variant="h6" color="primary" fontWeight={600} mt={2}>
                 🎉 Level Up! You are now Level {result.newLevel}!
               </Typography>
