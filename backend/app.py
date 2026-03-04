@@ -18,7 +18,20 @@ from src.services.seed import seed_initial_data
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
+    
+    # Configure CORS to allow frontend origins
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:5173",  # Local development
+                "https://compile-x-tau.vercel.app",  # Production Vercel
+                "https://*.vercel.app"  # All Vercel preview deployments
+            ],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
+        }
+    })
 
     app.config['JWT_SECRET']           = os.getenv('JWT_SECRET', 'devsecret')
     # Allow student self-registration (always True for public sign-up)
