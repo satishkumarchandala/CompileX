@@ -1,8 +1,8 @@
 import React, { useState, useContext } from 'react'
 import { useNavigate, Link as RouterLink } from 'react-router-dom'
-import { 
-  Container, Paper, TextField, Button, Typography, Box, Alert, Link, 
-  FormControl, InputLabel, Select, MenuItem 
+import {
+  Container, Paper, TextField, Button, Typography, Box, Alert, Link,
+  FormControl, InputLabel, Select, MenuItem
 } from '@mui/material'
 import { PersonAdd } from '@mui/icons-material'
 import { register as apiRegister } from '../api'

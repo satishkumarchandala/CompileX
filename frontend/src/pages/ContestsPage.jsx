@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Container, Grid, Card, CardContent, Typography, Box, Chip, Button,
   Paper, Divider, LinearProgress, Dialog, DialogTitle, DialogContent,
   DialogActions, Table, TableBody, TableCell, TableContainer, TableHead,
@@ -50,10 +50,10 @@ export default function ContestsPage() {
       // Navigate to contest quiz page
       navigate(`/contest/${contest._id}/quiz`)
     } catch (err) {
-      setSnackbar({ 
-        open: true, 
-        message: err.response?.data?.error || 'Failed to join contest', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.error || 'Failed to join contest',
+        severity: 'error'
       })
     }
   }
@@ -65,10 +65,10 @@ export default function ContestsPage() {
       setLeaderboard(res.data.leaderboard)
       setOpenLeaderboard(true)
     } catch (err) {
-      setSnackbar({ 
-        open: true, 
-        message: 'Failed to load leaderboard', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: 'Failed to load leaderboard',
+        severity: 'error'
       })
     }
   }
@@ -107,9 +107,9 @@ export default function ContestsPage() {
         <Grid container spacing={3}>
           {contests.map(c => (
             <Grid item xs={12} md={6} key={c._id}>
-              <Card 
+              <Card
                 elevation={3}
-                sx={{ 
+                sx={{
                   height: '100%',
                   transition: 'transform 0.2s',
                   '&:hover': { transform: 'translateY(-4px)' }
@@ -120,20 +120,20 @@ export default function ContestsPage() {
                     {c.title}
                   </Typography>
                   <Divider sx={{ my: 2 }} />
-                  
+
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    <Chip 
-                      icon={<Timer />} 
-                      label={`${c.durationMinutes} minutes`} 
-                      size="small" 
-                      color="primary" 
+                    <Chip
+                      icon={<Timer />}
+                      label={`${c.durationMinutes} minutes`}
+                      size="small"
+                      color="primary"
                       variant="outlined"
                     />
                     {c.negativeMarking > 0 && (
-                      <Chip 
-                        label={`-${c.negativeMarking} per wrong`} 
-                        size="small" 
-                        color="error" 
+                      <Chip
+                        label={`-${c.negativeMarking} per wrong`}
+                        size="small"
+                        color="error"
                         variant="outlined"
                       />
                     )}
@@ -144,16 +144,16 @@ export default function ContestsPage() {
                   </Typography>
 
                   <Box sx={{ display: 'flex', gap: 1, mt: 3 }}>
-                    <Button 
-                      variant="contained" 
+                    <Button
+                      variant="contained"
                       fullWidth
                       startIcon={<EmojiEvents />}
                       onClick={() => handleJoinContest(c)}
                     >
                       Join Contest
                     </Button>
-                    <Button 
-                      variant="outlined" 
+                    <Button
+                      variant="outlined"
                       startIcon={<TrendingUp />}
                       onClick={() => handleViewLeaderboard(c)}
                     >
@@ -195,11 +195,11 @@ export default function ContestsPage() {
                 </TableHead>
                 <TableBody>
                   {leaderboard.map((entry, idx) => (
-                    <TableRow 
+                    <TableRow
                       key={entry._id}
-                      sx={{ 
+                      sx={{
                         bgcolor: idx === 0 ? 'gold' : idx === 1 ? 'silver' : idx === 2 ? '#cd7f32' : 'inherit',
-                        '& td': { 
+                        '& td': {
                           color: idx < 3 ? 'white' : 'inherit',
                           fontWeight: idx < 3 ? 600 : 400
                         }
@@ -227,14 +227,14 @@ export default function ContestsPage() {
       </Dialog>
 
       {/* Snackbar for notifications */}
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >

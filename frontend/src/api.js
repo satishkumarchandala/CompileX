@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const API = axios.create({
-  baseURL: 'https://compilex-1-u5bd.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://compilex-1-u5bd.onrender.com/api',
   headers: { 'Content-Type': 'application/json' }
 })
 

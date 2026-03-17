@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from 'react'
-import { 
+import {
   Container, Grid, Card, CardContent, Typography, Box, Chip, Avatar,
   List, ListItem, ListItemText, Paper, Divider, LinearProgress, IconButton
 } from '@mui/material'
@@ -49,8 +49,8 @@ export default function ProfilePage() {
   return (
     <Container maxWidth="lg">
       <Paper elevation={3} sx={{ p: 4, mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', position: 'relative' }}>
-        <IconButton 
-          onClick={loadProfileData} 
+        <IconButton
+          onClick={loadProfileData}
           disabled={refreshing}
           sx={{ position: 'absolute', top: 16, right: 16, color: 'white' }}
         >
@@ -114,11 +114,11 @@ export default function ProfilePage() {
             {progress.length > 0 ? (
               <List>
                 {progress.reverse().map((a, i) => (
-                  <ListItem 
+                  <ListItem
                     key={i}
-                    sx={{ 
-                      bgcolor: 'action.hover', 
-                      mb: 1, 
+                    sx={{
+                      bgcolor: 'action.hover',
+                      mb: 1,
                       borderRadius: 1,
                       display: 'flex',
                       justifyContent: 'space-between'
@@ -129,7 +129,7 @@ export default function ProfilePage() {
                       secondary={`Time: ${a.timeTaken}s • ${new Date(a.attemptedAt).toLocaleDateString()}`}
                     />
                     <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <Chip label={`${a.score}/${a.total}`} color={a.score/a.total >= 0.8 ? 'success' : 'default'} />
+                      <Chip label={`${a.score}/${a.total}`} color={a.score / a.total >= 0.8 ? 'success' : 'default'} />
                       <Chip label={`+${a.xpEarned} XP`} color="primary" variant="outlined" />
                     </Box>
                   </ListItem>

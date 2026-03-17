@@ -277,11 +277,23 @@ def contest_leaderboard(contest_id):
           .sort([('rank', 1)])
     )
     result = []
+    # Collect all missing student IDs for batch query
+    missing_name_uids = [e['studentId'] for e in lb if not e.get('studentName')]
+    name_map = {}
+    if missing_name_uids:
+        users = list(db.users.find({'_id': {'$in': missing_name_uids}}, {'name': 1}))
+        name_map = {u['_id']: u.get('name', 'Unknown Student') for u in users}
+
     for e in lb:
+        s_id = e['studentId']
+        s_name = e.get('studentName')
+        if not s_name:
+            s_name = name_map.get(s_id, 'Unknown Student')
+
         result.append({
             'rank':         e.get('rank'),
-            'studentId':    str(e['studentId']),
-            'studentName':  e.get('studentName', ''),
+            'studentId':    str(s_id),
+            'studentName':  s_name,
             'instructorId': str(e['instructorId']) if e.get('instructorId') else None,
             'score':        e.get('score', 0),
             'correctCount': e.get('correctCount', 0),
@@ -300,11 +312,23 @@ def global_leaderboard():
     db      = get_db()
     entries = list(db.globalLeaderboard.find({}).sort('rank', 1).limit(100))
     result  = []
+    
+    missing_name_uids = [e['studentId'] for e in entries if not e.get('studentName')]
+    name_map = {}
+    if missing_name_uids:
+        users = list(db.users.find({'_id': {'$in': missing_name_uids}}, {'name': 1}))
+        name_map = {u['_id']: u.get('name', 'Unknown Student') for u in users}
+
     for e in entries:
+        s_id = e['studentId']
+        s_name = e.get('studentName')
+        if not s_name:
+            s_name = name_map.get(s_id, 'Unknown Student')
+
         result.append({
             'rank':                  e.get('rank'),
-            'studentId':             str(e['studentId']),
-            'studentName':           e.get('studentName', ''),
+            'studentId':             str(s_id),
+            'studentName':           s_name,
             'xp':                    e.get('xp', 0),
             'level':                 e.get('level', 1),
             'completedModulesCount': e.get('completedModulesCount', 0)

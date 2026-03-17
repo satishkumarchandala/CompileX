@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { 
+import {
   Container, Grid, Card, CardContent, Typography, Box, Chip, Button,
   CardActionArea, LinearProgress
 } from '@mui/material'
@@ -66,7 +66,7 @@ export default function ExplorePage() {
 
       {courses.map(c => {
         const courseModules = modules.filter(m => m.courseId === c._id)
-        
+
         return (
           <Box key={c._id} sx={{ mb: 4 }}>
             <Card elevation={2} sx={{ mb: 3, p: 2 }}>
@@ -84,11 +84,11 @@ export default function ExplorePage() {
                 const isCompleted = completedModules.includes(module._id)
                 return (
                   <Grid item xs={12} sm={6} md={4} key={module._id}>
-                    <Card 
+                    <Card
                       elevation={3}
-                      sx={{ 
+                      sx={{
                         height: '100%',
-                        background: isCompleted 
+                        background: isCompleted
                           ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)'
                           : `linear-gradient(135deg, ${moduleColors[idx % moduleColors.length]} 0%, ${moduleColors[(idx + 1) % moduleColors.length]} 100%)`,
                         color: 'white',
@@ -98,15 +98,15 @@ export default function ExplorePage() {
                       }}
                     >
                       {isCompleted && (
-                        <CheckCircle 
-                          sx={{ 
-                            position: 'absolute', 
-                            top: 10, 
-                            right: 10, 
+                        <CheckCircle
+                          sx={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
                             fontSize: 30,
                             bgcolor: 'rgba(255,255,255,0.3)',
                             borderRadius: '50%'
-                          }} 
+                          }}
                         />
                       )}
                       <CardActionArea onClick={() => navigate(`/module/${module._id}`)} sx={{ height: '100%' }}>
@@ -118,11 +118,11 @@ export default function ExplorePage() {
                             {module.title}
                           </Typography>
                           {isCompleted ? (
-                            <Chip 
-                              label="Completed" 
+                            <Chip
+                              label="Completed"
                               icon={<CheckCircle />}
-                              sx={{ 
-                                bgcolor: 'rgba(255,255,255,0.3)', 
+                              sx={{
+                                bgcolor: 'rgba(255,255,255,0.3)',
                                 color: 'white',
                                 fontWeight: 600,
                                 alignSelf: 'flex-start'
@@ -133,11 +133,11 @@ export default function ExplorePage() {
                               Click to view content and take quiz
                             </Typography>
                           )}
-                          <Button 
-                            variant="contained" 
+                          <Button
+                            variant="contained"
                             startIcon={isCompleted ? <CheckCircle /> : <PlayCircle />}
-                            sx={{ 
-                              bgcolor: 'rgba(255,255,255,0.2)', 
+                            sx={{
+                              bgcolor: 'rgba(255,255,255,0.2)',
                               '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' },
                               alignSelf: 'flex-start',
                               mt: 'auto'
