@@ -31,6 +31,13 @@ def _serialize_user(u: dict) -> dict:
         u['instructorId'] = str(u['instructorId'])
     if u.get('createdBy'):
         u['createdBy'] = str(u['createdBy'])
+        
+    if isinstance(u.get('completedModules'), list):
+        u['completedModules'] = [str(mid) for mid in u['completedModules']]
+    
+    if u.get('createdAt') and hasattr(u['createdAt'], 'isoformat'):
+        u['createdAt'] = u['createdAt'].isoformat() + 'Z'
+        
     u.pop('passwordHash', None)
     return u
 
