@@ -72,4 +72,9 @@ export const assignStudents = (data) => API.post('/superadmin/assign-student', d
 export const unassignStudent = (data) => API.delete('/superadmin/unassign-student', { data })
 export const rebuildLeaderboard = () => API.post('/superadmin/rebuild-leaderboard')
 
+// ── Module Unlock (Quiz Gating) ───────────────────────────────────────────
+export const openModule       = (id)       => API.post(`/modules/${id}/open`)
+export const updateVideoProgress = (id, data) => API.post(`/modules/${id}/video/progress`, data)
+export const getUnlockStatus  = (id)       => API.get(`/modules/${id}/unlock-status`)
+
 export default API

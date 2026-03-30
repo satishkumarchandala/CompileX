@@ -126,7 +126,19 @@ export default function SuperAdminDashboard() {
         try {
             const res = await assignStudents(assignForm)
             const d = res.data
-            showSnackbar(`Assigned ${d.assigned} student(s). ${d.alreadyAssigned} already assigned.`)
+            let msg = `Assigned ${d.assigned} student(s). ${d.alreadyAssigned} already assigned.`
+            if (d.emailStatus === 'sent') {
+                msg += ' Email notifications sent ✓'
+                showSnackbar(msg, 'success')
+            } else if (d.emailStatus === 'partial_failure' || d.emailStatus === 'failed') {
+                showSnackbar(msg, 'success')
+                setTimeout(() => showSnackbar(
+                    'Warning: Some email notifications failed to send. Check server logs.',
+                    'warning'
+                ), 500)
+            } else {
+                showSnackbar(msg)
+            }
             closeDialog()
             loadAll()
         } catch (e) {

@@ -2,8 +2,14 @@
 Quiz Routes — /api/
 Handles module question fetching and quiz submission with XP/badge logic.
 On each submission the userProgress and globalLeaderboard snapshots are updated.
+
+Quiz unlock enforcement:
+  GET /api/modules/<module_id>/questions now checks moduleUnlocks collection.
+  Students without an isUnlocked=True record receive 403 { error, reason }.
+  Admins and super-admins are exempt from the gate.
 """
 import datetime
+import logging
 from flask import Blueprint, request
 from bson import ObjectId
 
@@ -14,20 +20,70 @@ from src.models import (
     BADGE_FIRST_STEP, BADGE_SPEED_DEMON
 )
 from src.leaderboard_service import update_student_snapshots
+from src.auth import get_current_user
+
+logger = logging.getLogger(__name__)
 
 quiz_bp = Blueprint('quiz', __name__)
 
 
 @quiz_bp.get('/modules/<module_id>/questions')
 def get_questions(module_id):
-    db = get_db()
-    q  = list(db.questions.find(
+    """
+    Returns quiz questions for a module.
+    Requires the (student, module) unlock to be satisfied first.
+    Admins and super-admins bypass the lock check.
+    """
+    db   = get_db()
+    user = get_current_user()
+
+    # ── Unlock gate (students only) ───────────────────────────────────────────
+    role = user.get('role') if user else None
+
+    if role == 'student':
+        try:
+            student_oid = ObjectId(user['uid'])
+            module_oid  = ObjectId(module_id)
+        except Exception:
+            return {'error': 'Invalid ID format'}, 400
+
+        unlock_doc = db.moduleUnlocks.find_one({
+            'studentId': student_oid,
+            'moduleId':  module_oid
+        })
+
+        if not unlock_doc or not unlock_doc.get('isUnlocked'):
+            video_ok   = unlock_doc.get('videoSatisfied', False)  if unlock_doc else False
+            reading_ok = unlock_doc.get('readTimerSatisfied', False) if unlock_doc else False
+
+            if not unlock_doc:
+                reason = "You must open the module content before attempting the quiz."
+            elif not video_ok:
+                reason = "You must watch all module videos to ≥ 95% before the quiz unlocks."
+            elif not reading_ok:
+                required = unlock_doc.get('readSecondsRequired', 300)
+                reason = (
+                    f"You must spend at least {required // 60} minute(s) reading the module "
+                    f"content before the quiz unlocks."
+                )
+            else:
+                reason = "Quiz is still locked. Complete all requirements to unlock."
+
+            return {'error': 'Quiz locked', 'reason': reason}, 403
+
+    elif not user:
+        # Unauthenticated — also blocked
+        return {'error': 'Authentication required'}, 401
+
+    # ── Fetch questions (no correct answer exposed) ───────────────────────────
+    q = list(db.questions.find(
         {'moduleId': ObjectId(module_id)},
         {'question': 1, 'options': 1}
     ))
     for i in q:
         i['_id'] = str(i['_id'])
     return {'questions': q}
+
 
 
 @quiz_bp.post('/modules/<module_id>/submit')

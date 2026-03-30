@@ -8,6 +8,7 @@ Responsibilities:
   - System-wide statistics
 """
 import datetime
+import logging
 from flask import Blueprint, request
 from bson import ObjectId
 
@@ -17,6 +18,9 @@ from src.auth import (
     super_admin_required, ROLE_ADMIN, ROLE_STUDENT
 )
 from src.leaderboard_service import rebuild_global_leaderboard
+from src.services.email_service import send_email
+
+logger = logging.getLogger(__name__)
 
 superadmin_bp = Blueprint('superadmin', __name__)
 
@@ -130,6 +134,7 @@ def assign_student():
     """
     Body: { "instructorId": "<id>", "studentIds": ["<id>", ...] }
     Idempotent: already-existing assignments are silently ignored.
+    Sends email notifications to both student and instructor after each DB write.
     """
     caller = get_current_user()
     db = get_db()
@@ -155,18 +160,23 @@ def assign_student():
     # Validate all students exist
     found_students = list(db.users.find(
         {'_id': {'$in': student_oids}, 'role': ROLE_STUDENT},
-        {'_id': 1}
+        {'_id': 1, 'name': 1, 'email': 1}
     ))
-    found_ids = {s['_id'] for s in found_students}
-    missing   = [str(oid) for oid in student_oids if oid not in found_ids]
+    found_map  = {s['_id']: s for s in found_students}
+    missing    = [str(oid) for oid in student_oids if oid not in found_map]
     if missing:
         return {'error': f'Students not found or not students: {missing}'}, 404
 
-    now = datetime.datetime.utcnow()
-    assigned_count  = 0
-    skipped_count   = 0
+    instructor_name  = instructor.get('name', instructor.get('email', str(instructor_oid)))
+    instructor_email = instructor.get('email', '')
+
+    now            = datetime.datetime.utcnow()
+    assigned_count = 0
+    skipped_count  = 0
+    email_failures = []
 
     for student_oid in student_oids:
+        student = found_map[student_oid]
         try:
             db.instructor_assignments.insert_one({
                 'instructorId': instructor_oid,
@@ -192,15 +202,83 @@ def assign_student():
                 upsert=False
             )
             assigned_count += 1
+
+            # ── Send email notifications (only after successful DB write) ──────
+            student_name  = student.get('name', student.get('email', str(student_oid)))
+            student_email = student.get('email', '')
+
+            email_ok = True
+
+            # Email → student
+            if student_email:
+                student_body = (
+                    f"Hello {student_name},\n\n"
+                    f"You have been assigned to Instructor {instructor_name} ({instructor_email}) "
+                    f"on the CompileX platform.\n\n"
+                    f"Your instructor will now be able to monitor your progress and provide guidance. "
+                    f"Keep up the great work!\n\n"
+                    f"Best regards,\nCompileX Platform"
+                )
+                ok = send_email(
+                    to_email=student_email,
+                    subject="You've been assigned to an instructor on CompileX",
+                    body=student_body
+                )
+                if not ok:
+                    email_ok = False
+                    email_failures.append({
+                        'studentId': str(student_oid),
+                        'reason': 'student email failed'
+                    })
+
+            # Email → instructor
+            if instructor_email:
+                instructor_body = (
+                    f"Hello {instructor_name},\n\n"
+                    f"A new student has been assigned to you on the CompileX platform:\n\n"
+                    f"  • Name:  {student_name}\n"
+                    f"  • Email: {student_email}\n\n"
+                    f"You can view their progress in your instructor dashboard.\n\n"
+                    f"Best regards,\nCompileX Platform"
+                )
+                ok = send_email(
+                    to_email=instructor_email,
+                    subject=f"New student assigned to you: {student_name}",
+                    body=instructor_body
+                )
+                if not ok:
+                    email_ok = False
+                    email_failures.append({
+                        'studentId': str(student_oid),
+                        'reason': 'instructor email failed'
+                    })
+
+            if not email_ok:
+                logger.warning(
+                    "Email notification(s) failed for assignment: student=%s instructor=%s",
+                    str(student_oid), str(instructor_oid)
+                )
+
         except Exception:
             # Duplicate key error — already assigned
             skipped_count += 1
 
-    return {
+    response = {
         'status': 'done',
         'assigned': assigned_count,
-        'alreadyAssigned': skipped_count
+        'alreadyAssigned': skipped_count,
     }
+
+    if email_failures:
+        response['emailStatus'] = 'partial_failure'
+        response['emailFailures'] = email_failures
+        logger.error(
+            "Some assignment emails failed: %s", email_failures
+        )
+    else:
+        response['emailStatus'] = 'sent' if assigned_count > 0 else 'none'
+
+    return response
 
 
 # ─────────────────────────────────────────────────────────────────────────────

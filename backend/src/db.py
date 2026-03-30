@@ -76,3 +76,14 @@ def _ensure_indexes(db):
 
     # ── modules ───────────────────────────────────────────────────────────────
     db.modules.create_index([('courseId', ASCENDING), ('moduleNo', ASCENDING)])
+
+    # ── moduleUnlocks ─────────────────────────────────────────────────────────
+    # Compound unique so each (student, module) pair can only have one document
+    db.moduleUnlocks.create_index(
+        [('studentId', ASCENDING), ('moduleId', ASCENDING)],
+        unique=True
+    )
+    db.moduleUnlocks.create_index([('studentId', ASCENDING)])
+    db.moduleUnlocks.create_index([('moduleId', ASCENDING)])
+    db.moduleUnlocks.create_index([('isUnlocked', ASCENDING)])
+

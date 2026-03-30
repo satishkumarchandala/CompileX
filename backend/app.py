@@ -13,6 +13,7 @@ from src.routes.gamification_routes import gamification_bp
 from src.routes.contest_routes import contest_bp
 from src.routes.admin_routes import admin_bp
 from src.routes.superadmin_routes import superadmin_bp
+from src.routes.module_unlock_routes import module_unlock_bp
 from src.services.seed import seed_initial_data
 
 
@@ -46,13 +47,14 @@ def create_app():
     seed_initial_data()
 
     # ── Register Blueprints ───────────────────────────────────────────────────
-    app.register_blueprint(auth_bp,        url_prefix='/api/auth')
-    app.register_blueprint(course_bp,      url_prefix='/api')
-    app.register_blueprint(quiz_bp,        url_prefix='/api')
-    app.register_blueprint(gamification_bp, url_prefix='/api')
-    app.register_blueprint(contest_bp,     url_prefix='/api')
-    app.register_blueprint(admin_bp,       url_prefix='/api/admin')
-    app.register_blueprint(superadmin_bp,  url_prefix='/api/superadmin')
+    app.register_blueprint(auth_bp,           url_prefix='/api/auth')
+    app.register_blueprint(course_bp,         url_prefix='/api')
+    app.register_blueprint(quiz_bp,           url_prefix='/api')
+    app.register_blueprint(module_unlock_bp,  url_prefix='/api')
+    app.register_blueprint(gamification_bp,   url_prefix='/api')
+    app.register_blueprint(contest_bp,        url_prefix='/api')
+    app.register_blueprint(admin_bp,          url_prefix='/api/admin')
+    app.register_blueprint(superadmin_bp,     url_prefix='/api/superadmin')
 
     @app.route('/api/health')
     def health():

@@ -17,14 +17,41 @@ export default function QuizPage() {
   const [start, setStart] = useState(Date.now())
   const [loading, setLoading] = useState(true)
   const [result, setResult] = useState(null)
+  const [locked, setLocked] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
-    getQuestions(id).then(r => {
-      setQuestions(r.data.questions)
-      setLoading(false)
-    })
+    getQuestions(id)
+      .then(r => {
+        setQuestions(r.data.questions)
+        setLoading(false)
+      })
+      .catch(err => {
+        if (err.response?.status === 403) {
+          setLocked({ reason: err.response.data?.reason || 'Quiz is locked.' })
+        }
+        setLoading(false)
+      })
   }, [id])
+
+  if (loading) return <LinearProgress />
+
+  if (locked) {
+    return (
+      <Container maxWidth="sm">
+        <Paper elevation={3} sx={{ p: 4, mt: 4, textAlign: 'center' }}>
+          <Box sx={{ fontSize: 80, mb: 2 }}>🔒</Box>
+          <Typography variant="h4" fontWeight={700} gutterBottom>Quiz Locked</Typography>
+          <Typography variant="body1" color="text.secondary" mb={3}>
+            {locked.reason}
+          </Typography>
+          <Button variant="contained" onClick={() => navigate(`/module/${id}`)}>
+            Go Back to Module
+          </Button>
+        </Paper>
+      </Container>
+    )
+  }
 
   function handleChange(qid, val) {
     setAnswers({ ...answers, [qid]: parseInt(val) })
